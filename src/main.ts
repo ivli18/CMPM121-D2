@@ -15,6 +15,16 @@ const clearBtn = document.createElement("button");
 clearBtn.textContent = "Clear";
 document.body.appendChild(clearBtn);
 
+const undoBtn = document.createElement("button");
+undoBtn.textContent = "Undo";
+document.body.appendChild(undoBtn);
+
+const redoBtn = document.createElement("button");
+redoBtn.textContent = "Redo";
+document.body.appendChild(redoBtn);
+
+const redoStack: { x: number; y: number }[][] = [];
+
 const ctx = canvas.getContext("2d")!;
 if (!ctx) throw new Error("2D context not supported");
 
@@ -86,6 +96,21 @@ canvas.addEventListener("mouseleave", (e: MouseEvent) => {
 clearBtn.addEventListener("click", () => {
   displayList.length = 0;
   currentStroke = null;
+  redoStack.length = 0;
+  triggerRedraw();
+});
+
+undoBtn.addEventListener("click", () => {
+  if (displayList.length === 0) return;
+  const lastStroke = displayList.pop();
+  if (lastStroke) redoStack.push(lastStroke);
+  triggerRedraw();
+});
+
+redoBtn.addEventListener("click", () => {
+  if (redoStack.length === 0) return;
+  const redoneStroke = redoStack.pop()!;
+  displayList.push(redoneStroke);
   triggerRedraw();
 });
 
