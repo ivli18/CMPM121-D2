@@ -26,3 +26,33 @@ if (!ctx) {
   console.error("Failed to get 2D context");
   throw new Error("Canvas 2D context not supported");
 }
+
+let isDrawing = false;
+
+canvas.addEventListener("mousedown", (e) => {
+  isDrawing = true;
+  // Start a new line at current position
+  const { offsetX, offsetY } = e;
+  ctx.beginPath();
+  ctx.moveTo(offsetX, offsetY);
+});
+
+canvas.addEventListener("mousemove", (e) => {
+  if (isDrawing) {
+    const { offsetX, offsetY } = e;
+    ctx.lineTo(offsetX, offsetY);
+    ctx.stroke();
+  }
+});
+
+canvas.addEventListener("mouseup", () => {
+  isDrawing = false;
+});
+
+canvas.addEventListener("mouseleave", () => {
+  isDrawing = false; // So releasing outside still stops drawing
+});
+
+clearBtn.addEventListener("click", () => {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+});
