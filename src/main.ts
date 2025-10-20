@@ -55,6 +55,25 @@ interface Drawable {
   display(ctx: CanvasRenderingContext2D): void;
 }
 
+class PreviewCommand implements Drawable {
+  constructor(
+    private x: number,
+    private y: number,
+    private thickness: number,
+  ) {}
+
+  display(ctx: CanvasRenderingContext2D) {
+    ctx.save();
+    ctx.lineWidth = 2;
+    ctx.strokeStyle = "gray";
+    ctx.setLineDash([4, 4]);
+    ctx.beginPath();
+    ctx.arc(this.x, this.y, this.thickness / 2, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.restore();
+  }
+}
+
 class LineCommand implements Drawable {
   constructor(
     private points: { x: number; y: number }[],
@@ -93,12 +112,14 @@ class LineCommand implements Drawable {
 const displayList: Drawable[] = [];
 const redoStack: Drawable[] = [];
 let currentStroke: LineCommand | null = null;
+let currentPreview: PreviewCommand | null = null;
 
 // --- Redraw Logic ---
 function redraw() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
   displayList.forEach((stroke) => stroke.display(ctx));
   currentStroke?.display(ctx);
+  currentPreview?.display(ctx);
 
   // UX: disable buttons
   undoBtn.disabled = displayList.length === 0;
@@ -116,19 +137,28 @@ canvas.addEventListener("mousedown", (e) => {
 });
 
 canvas.addEventListener("mousemove", (e) => {
-  if (!(currentStroke && e.buttons === 1)) return;
-  currentStroke.drag({ x: e.offsetX, y: e.offsetY });
+  const pos = { x: e.offsetX, y: e.offsetY };
+  if (currentStroke && e.buttons === 1) {
+    currentStroke.drag(pos);
+    redraw();
+    return;
+  }
+  currentPreview = new PreviewCommand(pos.x, pos.y, currentThickness);
+  redraw();
+});
+canvas.addEventListener("mouseup", () => {
+  if (currentStroke && currentStroke.length > 0) {
+    displayList.push(currentStroke);
+    currentStroke = null;
+    redoStack.length = 0;
+  }
+  currentPreview = null;
   redraw();
 });
 
-["mouseup", "mouseleave"].forEach((event) => {
-  canvas.addEventListener(event, () => {
-    if (!currentStroke || currentStroke.length === 0) return;
-    displayList.push(currentStroke);
-    currentStroke = null;
-    redoStack.length = 0; // Invalidate redo on new stroke
-    redraw();
-  });
+canvas.addEventListener("mouseleave", () => {
+  currentPreview = null;
+  redraw();
 });
 
 clearBtn.addEventListener("click", () => {
