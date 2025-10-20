@@ -1,8 +1,6 @@
 import "./style.css";
 
 // --- Setup ---
-document.title = "Sticker Sketchpad";
-
 function setupUI() {
   const title = document.createElement("h1");
   title.textContent = "Sticker Sketchpad";
@@ -17,9 +15,17 @@ function setupUI() {
   const undoBtn = createButton("Undo");
   const redoBtn = createButton("Redo");
 
-  document.body.append(canvas, clearBtn, undoBtn, redoBtn);
+  const thinBtn = createButton("Thin");
+  const thickBtn = createButton("Thick");
 
-  return { canvas, clearBtn, undoBtn, redoBtn };
+  // Markers container
+  const tools = document.createElement("div");
+  tools.append(thinBtn, thickBtn);
+  tools.style.margin = "8px 0";
+
+  document.body.append(tools, canvas, clearBtn, undoBtn, redoBtn);
+
+  return { canvas, clearBtn, undoBtn, redoBtn, thinBtn, thickBtn };
 }
 
 function createButton(label: string): HTMLButtonElement {
@@ -28,9 +34,21 @@ function createButton(label: string): HTMLButtonElement {
   return button;
 }
 
-const { canvas, clearBtn, undoBtn, redoBtn } = setupUI();
+const { canvas, clearBtn, undoBtn, redoBtn, thinBtn, thickBtn } = setupUI();
 const ctx = canvas.getContext("2d")!;
 if (!ctx) throw new Error("2D context not supported");
+
+// -- Tool State --
+let currentThickness = 2;
+
+// -- UI: Highlight selected tool --
+function updateToolUI() {
+  thinBtn.classList.toggle("selectedTool", currentThickness === 2);
+  thickBtn.classList.toggle("selectedTool", currentThickness === 8);
+}
+
+// Initialize
+updateToolUI();
 
 // --- Drawing Model ---
 interface Drawable {
@@ -38,10 +56,13 @@ interface Drawable {
 }
 
 class LineCommand implements Drawable {
-  constructor(private points: { x: number; y: number }[]) {}
+  constructor(
+    private points: { x: number; y: number }[],
+    private thickness: number,
+  ) {}
 
-  static from(start: { x: number; y: number }): LineCommand {
-    return new LineCommand([start]);
+  static from(start: { x: number; y: number }, thickness: number): LineCommand {
+    return new LineCommand([start], thickness);
   }
 
   drag(point: { x: number; y: number }) {
@@ -54,6 +75,10 @@ class LineCommand implements Drawable {
 
   display(ctx: CanvasRenderingContext2D) {
     if (this.points.length < 2) return;
+
+    ctx.lineWidth = this.thickness;
+    ctx.lineCap = "round";
+    ctx.strokeStyle = "black";
 
     ctx.beginPath();
     ctx.moveTo(this.points[0]!.x, this.points[0]!.y);
@@ -83,7 +108,10 @@ function redraw() {
 // --- Events ---
 canvas.addEventListener("mousedown", (e) => {
   if (e.buttons !== 1) return;
-  currentStroke = LineCommand.from({ x: e.offsetX, y: e.offsetY });
+  currentStroke = LineCommand.from(
+    { x: e.offsetX, y: e.offsetY },
+    currentThickness,
+  );
   redraw();
 });
 
@@ -96,7 +124,6 @@ canvas.addEventListener("mousemove", (e) => {
 ["mouseup", "mouseleave"].forEach((event) => {
   canvas.addEventListener(event, () => {
     if (!currentStroke || currentStroke.length === 0) return;
-
     displayList.push(currentStroke);
     currentStroke = null;
     redoStack.length = 0; // Invalidate redo on new stroke
@@ -122,6 +149,16 @@ redoBtn.addEventListener("click", () => {
   if (redoStack.length === 0) return;
   displayList.push(redoStack.pop()!);
   redraw();
+});
+
+thinBtn.addEventListener("click", () => {
+  currentThickness = 2;
+  updateToolUI();
+});
+
+thickBtn.addEventListener("click", () => {
+  currentThickness = 8;
+  updateToolUI();
 });
 
 // Initial draw
