@@ -1,119 +1,128 @@
 import "./style.css";
 
+// --- Setup ---
 document.title = "Sticker Sketchpad";
-const title = document.createElement("h1");
-title.textContent = "Sticker Sketchpad";
-document.body.prepend(title);
 
-const canvas = document.createElement("canvas");
-canvas.width = 256;
-canvas.height = 256;
-canvas.id = "canvas";
-document.body.appendChild(canvas);
+function setupUI() {
+  const title = document.createElement("h1");
+  title.textContent = "Sticker Sketchpad";
+  document.body.prepend(title);
 
-const clearBtn = document.createElement("button");
-clearBtn.textContent = "Clear";
-document.body.appendChild(clearBtn);
+  const canvas = document.createElement("canvas");
+  canvas.width = 256;
+  canvas.height = 256;
+  canvas.id = "canvas";
 
-const undoBtn = document.createElement("button");
-undoBtn.textContent = "Undo";
-document.body.appendChild(undoBtn);
+  const clearBtn = createButton("Clear");
+  const undoBtn = createButton("Undo");
+  const redoBtn = createButton("Redo");
 
-const redoBtn = document.createElement("button");
-redoBtn.textContent = "Redo";
-document.body.appendChild(redoBtn);
+  document.body.append(canvas, clearBtn, undoBtn, redoBtn);
 
-const redoStack: { x: number; y: number }[][] = [];
+  return { canvas, clearBtn, undoBtn, redoBtn };
+}
 
+function createButton(label: string): HTMLButtonElement {
+  const button = document.createElement("button");
+  button.textContent = label;
+  return button;
+}
+
+const { canvas, clearBtn, undoBtn, redoBtn } = setupUI();
 const ctx = canvas.getContext("2d")!;
 if (!ctx) throw new Error("2D context not supported");
 
-const displayList: { x: number; y: number }[][] = [];
-let currentStroke: { x: number; y: number }[] | null = null;
+// --- Drawing Model ---
+interface Drawable {
+  display(ctx: CanvasRenderingContext2D): void;
+}
 
-function redrawCanvas() {
+class LineCommand implements Drawable {
+  constructor(private points: { x: number; y: number }[]) {}
+
+  static from(start: { x: number; y: number }): LineCommand {
+    return new LineCommand([start]);
+  }
+
+  drag(point: { x: number; y: number }) {
+    this.points.push(point);
+  }
+
+  get length(): number {
+    return this.points.length;
+  }
+
+  display(ctx: CanvasRenderingContext2D) {
+    if (this.points.length < 2) return;
+
+    ctx.beginPath();
+    ctx.moveTo(this.points[0]!.x, this.points[0]!.y);
+    for (let i = 1; i < this.points.length; i++) {
+      ctx.lineTo(this.points[i]!.x, this.points[i]!.y);
+    }
+    ctx.stroke();
+  }
+}
+
+// --- State ---
+const displayList: Drawable[] = [];
+const redoStack: Drawable[] = [];
+let currentStroke: LineCommand | null = null;
+
+// --- Redraw Logic ---
+function redraw() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
+  displayList.forEach((stroke) => stroke.display(ctx));
+  currentStroke?.display(ctx);
 
-  // Draw completed strokes
-  for (const stroke of displayList) {
-    if (stroke.length < 2) continue;
-    const [first, ...rest] = stroke;
-    if (!first) continue;
-
-    ctx.beginPath();
-    ctx.moveTo(first.x, first.y);
-    for (const point of rest) {
-      ctx.lineTo(point.x, point.y);
-    }
-    ctx.stroke();
-  }
-
-  // Draw current stroke
-  if (currentStroke && currentStroke.length >= 2) {
-    const first = currentStroke[0]!;
-    const rest = currentStroke.slice(1);
-
-    ctx.beginPath();
-    ctx.moveTo(first.x, first.y);
-    for (const point of rest) {
-      ctx.lineTo(point.x, point.y);
-    }
-    ctx.stroke();
-  }
-}
-function triggerRedraw() {
-  canvas.dispatchEvent(new Event("drawing-changed"));
+  // UX: disable buttons
+  undoBtn.disabled = displayList.length === 0;
+  redoBtn.disabled = redoStack.length === 0;
 }
 
-canvas.addEventListener("mousedown", (e: MouseEvent) => {
+// --- Events ---
+canvas.addEventListener("mousedown", (e) => {
   if (e.buttons !== 1) return;
-  currentStroke = [{ x: e.offsetX, y: e.offsetY }];
-  triggerRedraw();
+  currentStroke = LineCommand.from({ x: e.offsetX, y: e.offsetY });
+  redraw();
 });
 
-canvas.addEventListener("mousemove", (e: MouseEvent) => {
-  if (!currentStroke || e.buttons !== 1) return;
-  currentStroke.push({ x: e.offsetX, y: e.offsetY });
-  triggerRedraw();
+canvas.addEventListener("mousemove", (e) => {
+  if (!(currentStroke && e.buttons === 1)) return;
+  currentStroke.drag({ x: e.offsetX, y: e.offsetY });
+  redraw();
 });
 
-canvas.addEventListener("mouseup", () => {
-  if (currentStroke && currentStroke.length > 0) {
+["mouseup", "mouseleave"].forEach((event) => {
+  canvas.addEventListener(event, () => {
+    if (!currentStroke || currentStroke.length === 0) return;
+
     displayList.push(currentStroke);
     currentStroke = null;
-    triggerRedraw();
-  }
-});
-
-canvas.addEventListener("mouseleave", (e: MouseEvent) => {
-  if (currentStroke && e.buttons === 1) {
-    displayList.push(currentStroke);
-    currentStroke = null;
-    triggerRedraw();
-  }
+    redoStack.length = 0; // Invalidate redo on new stroke
+    redraw();
+  });
 });
 
 clearBtn.addEventListener("click", () => {
   displayList.length = 0;
-  currentStroke = null;
   redoStack.length = 0;
-  triggerRedraw();
+  currentStroke = null;
+  redraw();
 });
 
 undoBtn.addEventListener("click", () => {
   if (displayList.length === 0) return;
-  const lastStroke = displayList.pop();
-  if (lastStroke) redoStack.push(lastStroke);
-  triggerRedraw();
+  const last = displayList.pop();
+  if (last) redoStack.push(last);
+  redraw();
 });
 
 redoBtn.addEventListener("click", () => {
   if (redoStack.length === 0) return;
-  const redoneStroke = redoStack.pop()!;
-  displayList.push(redoneStroke);
-  triggerRedraw();
+  displayList.push(redoStack.pop()!);
+  redraw();
 });
 
-canvas.addEventListener("drawing-changed", redrawCanvas);
-
-triggerRedraw();
+// Initial draw
+redraw();
