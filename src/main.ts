@@ -29,6 +29,7 @@ function setupUI() {
   const redoBtn = createButton("Redo");
   const thinBtn = createButton("Thin");
   const thickBtn = createButton("Thick");
+  const exportBtn = createButton("Export");
 
   // Marker tools
   const tools = document.createElement("div");
@@ -48,7 +49,15 @@ function setupUI() {
       stickerTools.append(addStickerBtn);
     }
   });
-  document.body.append(stickerTools, tools, canvas, clearBtn, undoBtn, redoBtn);
+  document.body.append(
+    stickerTools,
+    tools,
+    canvas,
+    clearBtn,
+    undoBtn,
+    redoBtn,
+    exportBtn,
+  );
 
   return {
     canvas,
@@ -57,6 +66,7 @@ function setupUI() {
     redoBtn,
     thinBtn,
     thickBtn,
+    exportBtn,
     stickerTools,
   };
 }
@@ -67,7 +77,8 @@ function createButton(label: string): HTMLButtonElement {
   return button;
 }
 
-const { canvas, clearBtn, undoBtn, redoBtn, thinBtn, thickBtn } = setupUI();
+const { canvas, clearBtn, undoBtn, redoBtn, thinBtn, thickBtn, exportBtn } =
+  setupUI();
 const ctx = canvas.getContext("2d")!;
 if (!ctx) throw new Error("2D context not supported");
 
@@ -97,7 +108,6 @@ interface Drawable {
   display(ctx: CanvasRenderingContext2D): void;
 }
 
-// Now supports drag() for both lines and stickers
 interface Draggable extends Drawable {
   drag(pos: { x: number; y: number }): void;
 }
@@ -125,7 +135,7 @@ class StickerPreviewCommand implements Drawable {
   constructor(private x: number, private y: number, private emoji: string) {}
 
   display(ctx: CanvasRenderingContext2D) {
-    ctx.font = "24px system-ui, sans-serif"; // Better emoji support
+    ctx.font = "24px system-ui, sans-serif";
     ctx.fillText(this.emoji, this.x, this.y);
   }
 }
@@ -180,7 +190,7 @@ class LineCommand implements Draggable {
 // --- State ---
 const displayList: Drawable[] = [];
 const redoStack: Drawable[] = [];
-let currentStroke: Draggable | null = null; // ✅ Unified type
+let currentStroke: Draggable | null = null;
 let currentPreview: Drawable | null = null;
 
 // --- Redraw Logic ---
@@ -271,6 +281,19 @@ thinBtn.addEventListener("click", () => {
 thickBtn.addEventListener("click", () => {
   currentTool = { kind: "marker", thickness: 8 };
   updateToolUI();
+});
+
+exportBtn.addEventListener("click", () => {
+  const exportCanvas = document.createElement("canvas");
+  exportCanvas.width = 1024;
+  exportCanvas.height = 1024;
+  const exportCtx = exportCanvas.getContext("2d")!;
+  exportCtx.scale(4, 4);
+  displayList.forEach((item) => item.display(exportCtx));
+  const anchor = document.createElement("a");
+  anchor.href = exportCanvas.toDataURL("image/png");
+  anchor.download = "sketchpad.png";
+  anchor.click();
 });
 
 // Initial draw
