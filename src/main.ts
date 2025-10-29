@@ -1,6 +1,6 @@
 import "./style.css";
 
-let stickers = ["🐭", "✨", "🦎"];
+const stickers = ["🐭", "✨", "🦎"];
 function renderStickerBar(container: HTMLElement) {
   container.innerHTML = "";
   stickers.forEach((emoji) => {
