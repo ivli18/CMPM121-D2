@@ -1,5 +1,18 @@
 import "./style.css";
 
+let stickers = ["🐭", "✨", "🦎"];
+function renderStickerBar(container: HTMLElement) {
+  container.innerHTML = "";
+  stickers.forEach((emoji) => {
+    const btn = createButton(emoji);
+    btn.style.fontSize = "1.5em";
+    btn.addEventListener("click", () => {
+      currentTool = { kind: "sticker", emoji };
+    });
+    container.append(btn);
+  });
+}
+
 // --- Setup ---
 function setupUI() {
   const title = document.createElement("h1");
@@ -24,17 +37,17 @@ function setupUI() {
 
   // Sticker tools
   const stickerTools = document.createElement("div");
-  const stickers = ["🐭", "✨", "🦎"] as const;
-
-  stickers.forEach((emoji) => {
-    const btn = createButton(emoji);
-    btn.style.fontSize = "1.5em";
-    btn.addEventListener("click", () => {
-      currentTool = { kind: "sticker", emoji };
-    });
-    stickerTools.append(btn);
+  const addStickerBtn = createButton("➕");
+  renderStickerBar(stickerTools);
+  stickerTools.append(addStickerBtn);
+  addStickerBtn.addEventListener("click", () => {
+    const input = prompt("Custom sticker text", "🧽");
+    if (input && input.trim()) {
+      stickers.push(input.trim());
+      renderStickerBar(stickerTools);
+      stickerTools.append(addStickerBtn);
+    }
   });
-
   document.body.append(stickerTools, tools, canvas, clearBtn, undoBtn, redoBtn);
 
   return {
