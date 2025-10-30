@@ -31,6 +31,12 @@ function setupUI() {
   const thickBtn = createButton("Thick");
   const exportBtn = createButton("Export");
 
+  const controlBar = document.createElement("div");
+  controlBar.append(undoBtn, redoBtn, clearBtn, exportBtn);
+  controlBar.style.display = "flex";
+  controlBar.style.gap = "8px";
+  controlBar.style.margin = "8px 0";
+
   // Marker tools
   const tools = document.createElement("div");
   tools.append(thinBtn, thickBtn);
@@ -49,16 +55,8 @@ function setupUI() {
       stickerTools.append(addStickerBtn);
     }
   });
-  document.body.append(
-    stickerTools,
-    tools,
-    canvas,
-    clearBtn,
-    undoBtn,
-    redoBtn,
-    exportBtn,
-  );
 
+  document.body.append(stickerTools, tools, canvas, controlBar);
   return {
     canvas,
     clearBtn,
@@ -97,7 +95,7 @@ function updateToolUI() {
   );
   thickBtn.classList.toggle(
     "selectedTool",
-    currentTool.kind === "marker" && currentTool.thickness === 8,
+    currentTool.kind === "marker" && currentTool.thickness === 6,
   );
 }
 
@@ -135,7 +133,8 @@ class StickerPreviewCommand implements Drawable {
   constructor(private x: number, private y: number, private emoji: string) {}
 
   display(ctx: CanvasRenderingContext2D) {
-    ctx.font = "24px system-ui, sans-serif";
+    const size = Math.floor(canvas.height / 6);
+    ctx.font = `${size}px system-ui, sans-serif`;
     ctx.fillText(this.emoji, this.x, this.y);
   }
 }
@@ -149,7 +148,8 @@ class StickerCommand implements Draggable {
   }
 
   display(ctx: CanvasRenderingContext2D) {
-    ctx.font = "24px system-ui, sans-serif";
+    const size = Math.floor(canvas.height / 6);
+    ctx.font = `${size}px system-ui, sans-serif`;
     ctx.fillText(this.emoji, this.x, this.y);
   }
 }
@@ -195,12 +195,16 @@ let currentPreview: Drawable | null = null;
 
 // --- Redraw Logic ---
 function redraw() {
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  // Set canvas background (non-transparent)
+  ctx.fillStyle = "white";
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  // Draw all completed items
   displayList.forEach((item) => item.display(ctx));
   currentStroke?.display(ctx);
   currentPreview?.display(ctx);
 
-  // UX: disable buttons
+  // Update button states
   undoBtn.disabled = displayList.length === 0;
   redoBtn.disabled = redoStack.length === 0;
 }
@@ -279,7 +283,7 @@ thinBtn.addEventListener("click", () => {
 });
 
 thickBtn.addEventListener("click", () => {
-  currentTool = { kind: "marker", thickness: 8 };
+  currentTool = { kind: "marker", thickness: 6 };
   updateToolUI();
 });
 
