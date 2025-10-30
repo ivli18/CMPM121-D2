@@ -45,3 +45,8 @@ div[style*="flex"] {
   flex-wrap: wrap;
   justify-content: center;
 }
+
+.selectedTool {
+  outline: 3px solid #000;
+  transform: none;
+}

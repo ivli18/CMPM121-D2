@@ -82,24 +82,36 @@ if (!ctx) throw new Error("2D context not supported");
 
 // --- Tool State ---
 type Tool =
-  | { kind: "marker"; thickness: number }
+  | { kind: "marker"; thickness: number; color: string }
   | { kind: "sticker"; emoji: string };
 
-let currentTool: Tool = { kind: "marker", thickness: 2 };
+let currentTool: Tool = { kind: "marker", thickness: 2, color: "black" };
 
 // --- UI: Highlight selected tool ---
 function updateToolUI() {
-  thinBtn.classList.toggle(
-    "selectedTool",
-    currentTool.kind === "marker" && currentTool.thickness === 2,
-  );
-  thickBtn.classList.toggle(
-    "selectedTool",
-    currentTool.kind === "marker" && currentTool.thickness === 6,
-  );
+  const isThin = currentTool.kind === "marker" && currentTool.thickness === 2;
+  const isThick = currentTool.kind === "marker" && currentTool.thickness === 6;
+
+  thinBtn.classList.toggle("selectedTool", isThin);
+  thickBtn.classList.toggle("selectedTool", isThick);
+
+  // Only set background if current tool is marker
+  if (currentTool.kind === "marker") {
+    thinBtn.style.backgroundColor = isThin ? currentTool.color : "";
+    thickBtn.style.backgroundColor = isThick ? currentTool.color : "";
+  } else {
+    thinBtn.style.backgroundColor = "";
+    thickBtn.style.backgroundColor = "";
+  }
 }
 
 updateToolUI();
+
+// Random Color
+function randomColor() {
+  const h = Math.floor(Math.random() * 360);
+  return `hsl(${h}, 70%, 50%)`;
+}
 
 // --- Drawing Model ---
 interface Drawable {
@@ -120,7 +132,9 @@ class PreviewCommand implements Drawable {
   display(ctx: CanvasRenderingContext2D) {
     ctx.save();
     ctx.lineWidth = 2;
-    ctx.strokeStyle = "gray";
+    ctx.strokeStyle = currentTool.kind === "marker"
+      ? currentTool.color
+      : "gray";
     ctx.setLineDash([4, 4]);
     ctx.beginPath();
     ctx.arc(this.x, this.y, this.thickness / 2, 0, Math.PI * 2);
@@ -157,12 +171,20 @@ class StickerCommand implements Draggable {
 class LineCommand implements Draggable {
   private points: { x: number; y: number }[] = [];
 
-  constructor(start: { x: number; y: number }, private thickness: number) {
+  constructor(
+    start: { x: number; y: number },
+    private thickness: number,
+    private color: string,
+  ) {
     this.points.push(start);
   }
 
-  static from(start: { x: number; y: number }, thickness: number): LineCommand {
-    return new LineCommand(start, thickness);
+  static from(
+    start: { x: number; y: number },
+    thickness: number,
+    color: string,
+  ): LineCommand {
+    return new LineCommand(start, thickness, color);
   }
 
   drag(pos: { x: number; y: number }) {
@@ -177,7 +199,7 @@ class LineCommand implements Draggable {
     if (this.points.length < 2) return;
     ctx.lineWidth = this.thickness;
     ctx.lineCap = "round";
-    ctx.strokeStyle = "black";
+    ctx.strokeStyle = this.color;
     ctx.beginPath();
     ctx.moveTo(this.points[0]!.x, this.points[0]!.y);
     for (let i = 1; i < this.points.length; i++) {
@@ -212,13 +234,15 @@ function redraw() {
 // --- Events ---
 canvas.addEventListener("mousedown", (e) => {
   if (e.buttons !== 1) return;
-
   const pos = { x: e.offsetX, y: e.offsetY };
-
-  if (currentTool.kind === "sticker") {
-    currentStroke = new StickerCommand(pos.x, pos.y, currentTool.emoji);
+  if (currentTool.kind === "marker") {
+    currentStroke = LineCommand.from(
+      pos,
+      currentTool.thickness,
+      currentTool.color,
+    );
   } else {
-    currentStroke = LineCommand.from(pos, currentTool.thickness);
+    currentStroke = new StickerCommand(pos.x, pos.y, currentTool.emoji);
   }
   redraw();
 });
@@ -233,10 +257,10 @@ canvas.addEventListener("mousemove", (e) => {
   }
 
   // Update preview
-  if (currentTool.kind === "sticker") {
-    currentPreview = new StickerPreviewCommand(pos.x, pos.y, currentTool.emoji);
-  } else {
+  if (currentTool.kind === "marker") {
     currentPreview = new PreviewCommand(pos.x, pos.y, currentTool.thickness);
+  } else {
+    currentPreview = new StickerPreviewCommand(pos.x, pos.y, currentTool.emoji);
   }
   redraw();
 });
@@ -278,13 +302,15 @@ redoBtn.addEventListener("click", () => {
 });
 
 thinBtn.addEventListener("click", () => {
-  currentTool = { kind: "marker", thickness: 2 };
+  currentTool = { kind: "marker", thickness: 2, color: randomColor() };
   updateToolUI();
+  thinBtn.style.backgroundColor = currentTool.color;
 });
 
 thickBtn.addEventListener("click", () => {
-  currentTool = { kind: "marker", thickness: 6 };
+  currentTool = { kind: "marker", thickness: 6, color: randomColor() };
   updateToolUI();
+  thinBtn.style.backgroundColor = currentTool.color;
 });
 
 exportBtn.addEventListener("click", () => {
