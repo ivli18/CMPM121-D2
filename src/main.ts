@@ -310,7 +310,7 @@ thinBtn.addEventListener("click", () => {
 thickBtn.addEventListener("click", () => {
   currentTool = { kind: "marker", thickness: 6, color: randomColor() };
   updateToolUI();
-  thinBtn.style.backgroundColor = currentTool.color;
+  thickBtn.style.backgroundColor = currentTool.color;
 });
 
 exportBtn.addEventListener("click", () => {
